@@ -1,6 +1,10 @@
 package main
 
-import "net/http"
+import (
+	"net/http"
+	
+	"github.com/google/uuid"
+)
 
 func (cfg *apiConfig) handlerReset(w http.ResponseWriter, r *http.Request) {
 	if cfg.platform != "dev" {
@@ -14,6 +18,10 @@ func (cfg *apiConfig) handlerReset(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't reset database", err)
 		return
 	}
+	
+	// Clear the in-memory thumbnail storage
+	videoThumbnails = make(map[uuid.UUID]thumbnail)
+	
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Database reset to initial state"))
 }

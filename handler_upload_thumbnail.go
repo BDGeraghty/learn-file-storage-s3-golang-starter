@@ -1,9 +1,9 @@
 package main
- 
+
 import (
 	"fmt"
-	"net/http"
 	"io"
+	"net/http"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
@@ -25,7 +25,7 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	if mediaType == "" {
 		respondWithError(w, http.StatusBadRequest, "Content-Type header is missing", nil)
 		return
-	}	
+	}
 	iodata, err := io.ReadAll(file)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't read thumbnail file", err)
@@ -51,17 +51,37 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-
 	fmt.Println("uploading thumbnail for video", videoID, "by user", userID)
 
-	// TODO: implement the upload here
+	// Get the video to update it
+	video, err := cfg.db.GetVideo(videoID)
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "Video not found", err)
+		return
+	}
+
+	// Check if the user owns the video
+	if video.UserID != userID {
+		respondWithError(w, http.StatusForbidden, "You can only upload thumbnails for your own videos", nil)
+		return
+	}
+
+	// Store thumbnail in memory
 	videoThumbnails[videoID] = thumbnail{
 		data:      iodata,
 		mediaType: mediaType,
 	}
-	respondWithJSON(w, http.StatusOK, struct {
-		Message string `json:"message"`
-	}{
-		Message: "Thumbnail uploaded successfully",
+
+	// Update video with thumbnail URL
+	thumbnailURL := fmt.Sprintf("/api/thumbnails/%s", videoID)
+	video.ThumbnailURL = &thumbnailURL
+	err = cfg.db.UpdateVideo(video)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't update video with thumbnail URL", err)
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, map[string]string{
+		"message": "Thumbnail uploaded successfully",
 	})
 }

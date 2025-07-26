@@ -2,7 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/database"
@@ -38,6 +41,29 @@ func (cfg *apiConfig) handlerVideoMetaCreate(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't create video", err)
 		return
+	}
+
+	// Automatically assign a default thumbnail from samples
+	defaultThumbnailPath := filepath.Join("samples", "boots-image-horizontal.png")
+	if _, err := os.Stat(defaultThumbnailPath); err == nil {
+		// Read the default thumbnail file
+		file, err := os.Open(defaultThumbnailPath)
+		if err == nil {
+			defer file.Close()
+			thumbnailData, err := io.ReadAll(file)
+			if err == nil {
+				// Store the thumbnail in memory
+				videoThumbnails[video.ID] = thumbnail{
+					data:      thumbnailData,
+					mediaType: "image/png",
+				}
+				
+				// Update the video with thumbnail URL
+				thumbnailURL := "/api/thumbnails/" + video.ID.String()
+				video.ThumbnailURL = &thumbnailURL
+				cfg.db.UpdateVideo(video)
+			}
+		}
 	}
 
 	respondWithJSON(w, http.StatusCreated, video)
